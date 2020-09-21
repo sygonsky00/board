@@ -38,3 +38,7 @@ body {
 .highlighted {
   background-color: yellow;
 }
+.post-body,
+.comment-text {
+  white-space: pre-line;
+}

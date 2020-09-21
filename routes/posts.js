@@ -4,6 +4,7 @@ var express = require('express');
 var router = express.Router();
 var Post = require('../models/Post');
 var User = require('../models/User');
+var Comment = require('../models/Comment');
 var util = require('../util');
 
 // index
@@ -71,11 +72,19 @@ router.post('/', util.isLoggedin, function (req, res) {
 
 // show
 router.get('/:id', function (req, res) {
-  Post.findOne({_id:req.params.id})
-    .populate('author')
-    .exec(function (err, post) {
-      if(err) return res.json(err);
-      res.render('posts/show', {post:post});
+  var commentForm = req.flash('commentForm')[0] || {_id: null, form: {}};
+  var commentError = req.flash('commentError')[0] || {_id: null, parentComment: null, errors:{}};
+
+  Promise.all([
+    Post.findOne({_id:req.params.id}).populate({ path: 'author', select: 'username'}),
+    Comment.find({post:req.params.id}).sort('createdAt').populate({ path: 'author', select: 'username'})
+  ])
+  .then(([post, comments]) => {
+    res.render('posts/show', { post:post, comments:comments, commentForm:commentForm, commentError:commentError});
+  })
+  .catch((err) => {
+    consoles.log('err: ', err);
+    return res.json(err);
   });
 });
 
@@ -146,8 +155,8 @@ async function createSearchQuery(queries) {
     else if(searchTypes.indexOf('author')>=0){
       var users = await User.find({ username: { $regex: new RegExp(queries.searchText, 'i')}}).exec();
       var userIds = [];
-      for(var user of users){
-        userIds.push(user._id);
+      for(var user1 of users){
+        userIds.push(user1._id);
       }
       if(userIds.length>0) postQueries.push({author:{$in:userIds}});
     }
